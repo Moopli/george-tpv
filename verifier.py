@@ -147,7 +147,7 @@ def childPN(parent, i):
             count -= 1
         if count == 0:
             return [e for e in parent[i:j+1]]
-    raise "Bad Syntax, Cannot get child"
+    raise Exception("Bad Syntax, Cannot get child of ", parent, "at", i)
 
 '''
 Basic method for testing if a rule was applied correctly:
@@ -159,19 +159,45 @@ Basic method for testing if a rule was applied correctly:
 
 def testRule(t1, t2, rule):
     i = diffPN(t1, t2)
+    # [op0, *c_1, *c_2] where op0 is the same but c_1[0] is different
     op0 = t1[i - 1]
     c11 = childPN(t1, i)
     c21 = childPN(t2, i)
-    c12 = childPN(t1, i + len(c11))
-    c22 = childPN(t2, i + len(c21))
 
     # Now to choose the rule:
     if rule is "comm":
-        print t1, t2
-        print op0
-        print c11, c12, c21, c22
-        return op0 in '&|=' and diffPN(c11, c22) == -1 and diffPN(c12, c21) == -1
-
+        if i <= 0: return False # the trees cannot be completely different
+        c12 = childPN(t1, i + len(c11))
+        c22 = childPN(t2, i + len(c21))
+        return op0 in '&|=' and c11 == c22 and c12 == c21
+    if rule is 'contr': # should probably work on factoring this out and rerouting
+        if c11[0] is 'false':
+            if c21[0] != '&': return False
+            left = childPN(c21, 1)
+            right = childPN(c21, 1 + len(left))
+            if left[0] is '!' and left[1:] == right: return True
+            if right[0] is '!' and right[1:] == left: return True
+        if c21[0] is 'false':
+            if c11[0] != '&': return False
+            left = childPN(c11, 1)
+            right = childPN(c11, 1 + len(left))
+            if left[0] is '!' and left[1:] == right: return True
+            if right[0] is '!' and right[1:] == left: return True
+        return False
+    if rule is 'lem': # almost exactly the same as contr
+        if c11[0] is 'true':
+            if c21[0] != '|': return False
+            left = childPN(c21, 1)
+            right = childPN(c21, 1 + len(left))
+            if left[0] is '!' and left[1:] == right: return True
+            if right[0] is '!' and right[1:] == left: return True
+        if c21[0] is 'true':
+            if c11[0] != '|': return False
+            left = childPN(c11, 1)
+            right = childPN(c11, 1 + len(left))
+            if left[0] is '!' and left[1:] == right: return True
+            if right[0] is '!' and right[1:] == left: return True
+        return False
 
 
 
@@ -190,8 +216,18 @@ pn = prefix(proof['steps'][0])
 for i in xrange(len(pn)):
     print childPN(pn, i)
 
+def test(t1, t2, rule):
+    test1 = prefix(tokenize(t1))
+    test2 = prefix(tokenize(t2))
+    print testRule(test1, test2, rule)
 
-test1 = prefix(tokenize("a & b"))
-test2 = prefix(tokenize("b & a"))
+test("a & b", "b & a", 'comm')
+test("a | b", "b | a", 'comm')
+test("a = b", "b = a", 'comm')
+test("a | b", "b & a", 'comm') 
 
-print testRule(test1, test2, "comm")
+test("p & ! p", 'false', 'contr')
+test("p & ! c", 'false', 'contr')
+test("p | ! p", 'true', 'lem')
+test("p | ! c", 'true', 'lem')
+
